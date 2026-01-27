@@ -1,0 +1,31 @@
+# Production Requirements - Minimal (Fixed Dependencies)
+# Core Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# AI - Claude (Primary) - compatible version
+anthropic==0.18.1
+
+# OpenAI (optional, but needed for imports)
+openai>=1.10.0
+
+# Google Gemini (optional, requires Python 3.10+)
+# google-generativeai>=0.8.0
+
+# Data Collection
+tavily-python==0.3.1  # Optional - can use Twitter instead
+tweepy==4.14.0  # Twitter API v2
+httpx==0.23.3
+aiohttp==3.9.1
+
+# Background Task Scheduler
+APScheduler==3.10.4
+
+# Optional but recommended
+python-dotenv==1.0.0
+
+# Solana Blockchain Integration
+solana==0.30.2  # Older version compatible with httpx==0.23.3
+solders==0.18.1  # Compatible with solana==0.30.2

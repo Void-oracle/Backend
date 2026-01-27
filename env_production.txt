@@ -1,0 +1,52 @@
+# Production Configuration
+APP_ENV=production
+APP_HOST=0.0.0.0
+APP_PORT=8000
+DEBUG=False
+API_PREFIX=/api/v1
+
+# AI Provider - Claude
+AI_PROVIDER=claude
+ANTHROPIC_API_KEY=your-anthropic-api-key-here
+ANTHROPIC_MODEL=claude-sonnet-4-5-20250929
+
+# Google Gemini 3 Flash Preview
+GOOGLE_API_KEY=your-google-api-key-here
+GEMINI_MODEL=gemini-3-flash-preview
+
+# Optional
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4-turbo-preview
+
+# Data Collection - Twitter API
+TWITTER_BEARER_TOKEN=
+TWITTER_API_KEY=
+TWITTER_API_SECRET=
+
+# Solana (Devnet)
+SOLANA_RPC_URL=https://api.devnet.solana.com
+SOLANA_NETWORK=devnet
+SOLANA_PRIVATE_KEY=
+ORACLE_CONTRACT_ADDRESS=HFpSdCi7ywFTTHMTGbFYS5ivQ75P8PsGJ8vGN5WtPEwT
+
+# Optional
+MONGODB_URL=mongodb://localhost:27017
+MONGODB_DB_NAME=void_oracle
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Security
+SECRET_KEY=generate-random-secret-with-openssl-rand-hex-32
+ALGORITHM=HS256
+
+# Frontend URL (for CORS)
+FRONTEND_URL=yourdomain.com
+
+# Config
+SENTIMENT_THRESHOLD=0.6
+BOT_DETECTION_THRESHOLD=0.7
+MIN_INFLUENCER_FOLLOWERS=1000
+DIVERGENCE_HIGH_THRESHOLD=20
+RATE_LIMIT_REQUESTS=100
+RATE_LIMIT_WINDOW=60
+LOG_LEVEL=INFO
