@@ -100,8 +100,8 @@ async def initialize_oracle_system():
     logger.info("VOID ORACLE - INITIALIZATION PHASE")
     logger.info("=" * 60)
     
-    # Initialize default markets if none exist
-    markets_manager.initialize_default_markets()
+    # NOTE: Default markets disabled - users create their own test markets
+    # markets_manager.initialize_default_markets()
     
     # Load all active markets from database
     active_markets = markets_manager.get_active_markets()
@@ -199,6 +199,9 @@ app = FastAPI(
 cors_origins = [
     "http://localhost:3000",
     "http://localhost:3001",
+    # Vercel preview/production
+    "https://frontend-ebon-eight-92.vercel.app",
+    "https://*.vercel.app",
 ]
 
 # Add production domain from environment if set

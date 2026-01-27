@@ -18,14 +18,12 @@ router = APIRouter()
 
 class CreateMarketRequest(BaseModel):
     """Request to create a new market"""
-    market_id: str = Field(..., description="Unique market identifier")
-    ticker: str = Field(..., description="Ticker symbol (e.g., SOL, BTC)")
-    query: str = Field(..., description="Market question")
+    ticker: str = Field(..., description="Ticker symbol (e.g., BTC-200K, ETH-10K)")
+    query: str = Field(..., description="Market question (e.g., 'Will Bitcoin reach $200k by 2026?')")
     description: Optional[str] = Field(None, description="Market description")
-    category: str = Field("markets", description="Category: markets, sports, news, other")
-    deadline: Optional[str] = Field(None, description="Deadline in ISO format")
-    target_tweets: int = Field(500, description="Number of tweets to collect initially")
-    check_interval_minutes: int = Field(30, description="How often to check for updates")
+    category: str = Field("crypto", description="Category: crypto, tech, politics, sports, other")
+    deadline: Optional[str] = Field(None, description="Deadline in ISO format (e.g., 2026-12-31T23:59:59)")
+    check_interval_minutes: int = Field(30, description="How often to update predictions (minutes)")
 
 
 @router.post("/create")
@@ -34,11 +32,22 @@ async def create_market(request: CreateMarketRequest):
     Create a new prediction market dynamically
     
     The market will be:
-    1. Saved to database
+    1. Saved to database with auto-generated ID
     2. Initialized with AI analysis
     3. Monitored automatically
     
     All without server restart!
+    
+    Example request:
+    ```json
+    {
+        "ticker": "BTC-200K",
+        "query": "Will Bitcoin reach $200,000 by end of 2026?",
+        "description": "Bitcoin price prediction for 2026",
+        "category": "crypto",
+        "deadline": "2026-12-31T23:59:59"
+    }
+    ```
     """
     try:
         # Parse deadline
@@ -47,36 +56,37 @@ async def create_market(request: CreateMarketRequest):
             try:
                 deadline = datetime.fromisoformat(request.deadline.replace('Z', '+00:00'))
             except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid deadline format. Use ISO 8601.")
+                raise HTTPException(status_code=400, detail="Invalid deadline format. Use ISO 8601 (e.g., 2026-12-31T23:59:59)")
         
-        # Create market in registry
+        # Create market in registry (market_id auto-generated)
         market = markets_manager.create_market(
-            market_id=request.market_id,
             ticker=request.ticker,
             query=request.query,
             description=request.description,
             category=request.category,
             deadline=deadline,
-            target_tweets=request.target_tweets,
             check_interval_minutes=request.check_interval_minutes,
-            created_by="api"
+            created_by="user"
         )
         
+        market_id = market["market_id"]
+        
         # Start monitoring immediately (hot reload!)
-        logger.info(f"Starting monitoring for new market: {request.market_id}")
+        logger.info(f"Starting monitoring for new market: {market_id}")
+        
         # Initialize and start monitoring the new market
         asyncio.create_task(oracle_engine.initialize_market(
-            market_id=market["market_id"],
+            market_id=market_id,
             ticker=market["ticker"],
             query=market["query"],
             deadline=market["deadline"],
-            target_tweets=market.get("target_tweets", 500)
+            target_tweets=500
         ))
-        asyncio.create_task(oracle_engine.monitor_market(market["market_id"]))
+        asyncio.create_task(oracle_engine.monitor_market(market_id))
         
         return {
             "success": True,
-            "message": f"Market {request.market_id} created and monitoring started",
+            "message": f"Market {market_id} created and monitoring started",
             "market": market
         }
         
@@ -94,22 +104,60 @@ async def list_markets(
     monitoring_active: Optional[bool] = None
 ):
     """
-    List all markets with optional filters
+    List all markets with optional filters and AI scores
     
     - **status**: Filter by status (active, completed, archived)
-    - **category**: Filter by category (markets, sports, news, other)
+    - **category**: Filter by category (crypto, tech, politics, sports, other)
     - **monitoring_active**: Filter by monitoring status
     """
     try:
+        from app.core.market_database import get_market_db
+        
         markets = markets_manager.list_markets(
             status=status,
             category=category,
             monitoring_active=monitoring_active
         )
         
+        # Enrich with AI scores from market databases
+        enriched_markets = []
+        for market in markets:
+            market_data = dict(market)
+            market_id = market["market_id"]
+            
+            try:
+                market_db = get_market_db(market_id)
+                latest = market_db.get_latest_prediction()
+                
+                if latest:
+                    market_data["ai_score"] = latest.get("ai_score", 50.0)
+                    market_data["market_score"] = latest.get("market_score", 50.0)
+                    market_data["divergence_index"] = latest.get("divergence_index", 0.0)
+                    market_data["confidence"] = latest.get("confidence", 0.5)
+                    market_data["vocal_summary"] = latest.get("vocal_summary", "")
+                    market_data["last_prediction"] = latest.get("timestamp")
+                else:
+                    # No predictions yet - use defaults
+                    market_data["ai_score"] = 50.0
+                    market_data["market_score"] = 50.0
+                    market_data["divergence_index"] = 0.0
+                    market_data["confidence"] = 0.5
+                    market_data["vocal_summary"] = "Awaiting first AI analysis..."
+                    market_data["last_prediction"] = None
+            except Exception as e:
+                logger.debug(f"No market DB for {market_id}: {e}")
+                market_data["ai_score"] = 50.0
+                market_data["market_score"] = 50.0
+                market_data["divergence_index"] = 0.0
+                market_data["confidence"] = 0.5
+                market_data["vocal_summary"] = "Initializing..."
+                market_data["last_prediction"] = None
+            
+            enriched_markets.append(market_data)
+        
         return {
-            "count": len(markets),
-            "markets": markets
+            "count": len(enriched_markets),
+            "markets": enriched_markets
         }
         
     except Exception as e:
