@@ -52,9 +52,21 @@ class MarketsManager:
                 completed_at DATETIME,
                 created_by TEXT DEFAULT 'system',
                 monitoring_active BOOLEAN DEFAULT 1,
-                check_interval_minutes INTEGER DEFAULT 30
+                check_interval_minutes INTEGER DEFAULT 30,
+                external_market_url TEXT,
+                resolution TEXT
             )
         """)
+        
+        # Add columns if they don't exist (for existing databases)
+        try:
+            cursor.execute("ALTER TABLE markets ADD COLUMN external_market_url TEXT")
+        except:
+            pass  # Column already exists
+        try:
+            cursor.execute("ALTER TABLE markets ADD COLUMN resolution TEXT")
+        except:
+            pass  # Column already exists
         
         # Counter table to track next ID (persists across restarts)
         cursor.execute("""
@@ -102,10 +114,15 @@ class MarketsManager:
         target_tweets: int = 500,
         check_interval_minutes: int = 30,
         created_by: str = "system",
-        market_id: Optional[str] = None  # Optional - auto-generated if not provided
+        market_id: Optional[str] = None,  # Optional - auto-generated if not provided
+        external_market_url: Optional[str] = None  # Polymarket/PredictFun URL
     ) -> Dict[str, Any]:
         """
         Create a new market with auto-generated ID
+        
+        Args:
+            external_market_url: URL to external market (Polymarket, PredictFun, etc.)
+                               If provided, will fetch real market probability
         
         Returns market data
         """
@@ -120,8 +137,9 @@ class MarketsManager:
             cursor.execute("""
                 INSERT INTO markets (
                     market_id, ticker, query, description, category,
-                    deadline, target_tweets, created_by, check_interval_minutes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    deadline, target_tweets, created_by, check_interval_minutes,
+                    external_market_url
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 market_id,
                 ticker,
@@ -131,7 +149,8 @@ class MarketsManager:
                 deadline.isoformat() if deadline else None,
                 target_tweets,
                 created_by,
-                check_interval_minutes
+                check_interval_minutes,
+                external_market_url
             ))
             
             conn.commit()

@@ -260,14 +260,17 @@ class OracleEngine:
         update_interval_minutes: int = 30
     ):
         """
-        Phase 2: Periodic Updates
+        Phase 2: Periodic Updates with Deadline Checking
         
-        Updates market prediction every N minutes using Gemini + Claude
+        Updates market prediction every N minutes using Gemini + Claude.
+        Automatically closes market when deadline is reached.
         
         Args:
             market_id: Market to monitor
             update_interval_minutes: How often to update prediction (default: 30 min)
         """
+        from app.core.markets_manager import markets_manager
+        
         if market_id not in self.market_states:
             logger.error(f"❌ Market {market_id} not initialized")
             return
@@ -279,11 +282,67 @@ class OracleEngine:
         
         logger.info(f"MONITORING STARTED: {market_id}")
         logger.info(f"   Update interval: {update_interval_minutes} minutes")
+        if deadline:
+            logger.info(f"   Deadline: {deadline}")
         
         while True:
             try:
+                # Check if deadline has passed
+                if deadline and datetime.now() >= deadline:
+                    logger.info(f"⏰ DEADLINE REACHED: {market_id} ({ticker})")
+                    
+                    # Verify the event outcome
+                    verification = await self.verify_market_event(market_id, deadline)
+                    
+                    # Close the market
+                    resolution = "unknown"
+                    if verification and verification.get("decision"):
+                        decision = verification["decision"]
+                        if decision.get("decision") == "YES":
+                            resolution = "yes"
+                        elif decision.get("decision") == "NO":
+                            resolution = "no"
+                        else:
+                            resolution = "uncertain"
+                    
+                    # Update market status
+                    markets_manager.complete_market(market_id, outcome=resolution)
+                    
+                    # Update database with verification result
+                    market_db = get_market_db(market_id)
+                    
+                    # Serialize verification (convert Enums to strings)
+                    def serialize_verification(obj):
+                        if obj is None:
+                            return None
+                        if isinstance(obj, dict):
+                            return {k: serialize_verification(v) for k, v in obj.items()}
+                        if isinstance(obj, list):
+                            return [serialize_verification(i) for i in obj]
+                        if hasattr(obj, 'value'):  # Enum
+                            return obj.value
+                        return obj
+                    
+                    market_db.mark_completed({
+                        "resolution": resolution,
+                        "verification": serialize_verification(verification),
+                        "closed_at": datetime.now().isoformat()
+                    })
+                    
+                    logger.info(f"✅ MARKET CLOSED: {market_id} - Resolution: {resolution}")
+                    
+                    # Remove from monitoring
+                    if market_id in self.market_states:
+                        del self.market_states[market_id]
+                    
+                    return  # Exit monitoring loop
+                
                 # Wait for next update cycle
                 await asyncio.sleep(update_interval_minutes * 60)
+                
+                # Check deadline again after sleep
+                if deadline and datetime.now() >= deadline:
+                    continue  # Will be handled at start of next iteration
                 
                 logger.info(f"⏰ SCHEDULED UPDATE: {market_id} ({ticker})")
                 

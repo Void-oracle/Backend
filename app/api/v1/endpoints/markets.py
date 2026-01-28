@@ -24,6 +24,7 @@ class CreateMarketRequest(BaseModel):
     category: str = Field("crypto", description="Category: crypto, tech, politics, sports, other")
     deadline: Optional[str] = Field(None, description="Deadline in ISO format (e.g., 2026-12-31T23:59:59)")
     check_interval_minutes: int = Field(30, description="How often to update predictions (minutes)")
+    external_market_url: Optional[str] = Field(None, description="URL to external market (Polymarket, PredictFun, etc.)")
 
 
 @router.post("/create")
@@ -66,7 +67,8 @@ async def create_market(request: CreateMarketRequest):
             category=request.category,
             deadline=deadline,
             check_interval_minutes=request.check_interval_minutes,
-            created_by="user"
+            created_by="user",
+            external_market_url=request.external_market_url
         )
         
         market_id = market["market_id"]
